@@ -356,6 +356,21 @@ else:
             min_expected_roi=config.get("min_expected_roi", 0.03),
         )
 
+        if not candidates.empty:
+            week_dates = set(
+                pd.to_datetime(
+                    weekly_rankings["commence_time"], utc=True
+                ).dt.strftime("%Y-%m-%d")
+            )
+
+            candidates["game_date"] = pd.to_datetime(
+                candidates["commence_time"], utc=True
+            ).dt.strftime("%Y-%m-%d")
+
+            candidates = candidates[
+                candidates["game_date"].isin(week_dates)
+            ].copy()
+
         if candidates.empty:
             st.info("No candidates passed your configured filters.")
         else:
