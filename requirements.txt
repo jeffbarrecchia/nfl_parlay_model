@@ -3,6 +3,5 @@ numpy>=1.26
 scikit-learn>=1.5
 requests>=2.32
 joblib>=1.4
-nfl_data_py>=0.3.3
 nflreadpy
 streamlit
