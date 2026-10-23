@@ -200,6 +200,42 @@ else:
             ]
         ].copy()
 
+        # Match each game to its FanDuel moneyline odds.
+        odds_lookup = odds[
+            ["home_team", "away_team", "commence_time", "home_ml", "away_ml"]
+        ].copy()
+
+        odds_lookup["commence_time"] = pd.to_datetime(
+            odds_lookup["commence_time"], errors="coerce", utc=True
+        )
+
+        display["commence_time"] = pd.to_datetime(
+            display["commence_time"], errors="coerce", utc=True
+        )
+
+        display = display.merge(
+            odds_lookup,
+            on=["home_team", "away_team", "commence_time"],
+            how="left",
+        )
+
+        display["Model Pick Odds"] = display.apply(
+            lambda row: (
+                row["home_ml"]
+                if row["model_winner"] == row["home_team"]
+                else row["away_ml"]
+                if row["model_winner"] == row["away_team"]
+                else None
+            ),
+            axis=1,
+        )
+
+        display["Model Pick Odds"] = display["Model Pick Odds"].apply(
+            lambda value: (
+                f"{value:+.0f}" if pd.notna(value) else "N/A"
+            )
+        )
+
         display["commence_time"] = pd.to_datetime(
             display["commence_time"], utc=True
         ).dt.strftime("%a %b %d, %I:%M %p UTC")
@@ -216,6 +252,7 @@ else:
                 "home_team": "Home Team",
                 "model_winner": "Model Pick",
                 "model_win_probability": "Win Probability (%)",
+                "Model Pick Odds": "Model Pick Odds",
                 "fanduel_favorite": "FanDuel Favorite",
                 "model_agrees_with_favorite": "Agrees With Favorite",
             }
