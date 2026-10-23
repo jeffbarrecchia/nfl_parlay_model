@@ -213,10 +213,17 @@ else:
             display["commence_time"], errors="coerce", utc=True
         )
 
+        # Keep one odds record per game to prevent duplicate rankings.
+        odds_lookup = odds_lookup.drop_duplicates(
+            subset=["home_team", "away_team", "commence_time"],
+            keep="first",
+        )
+
         display = display.merge(
             odds_lookup,
             on=["home_team", "away_team", "commence_time"],
             how="left",
+            validate="one_to_one",
         )
 
         display["Model Pick Odds"] = display.apply(
@@ -257,6 +264,19 @@ else:
                 "model_agrees_with_favorite": "Agrees With Favorite",
             }
         )
+
+        display = display[
+            [
+                "Kickoff",
+                "Away Team",
+                "Home Team",
+                "Model Pick",
+                "Model Pick Odds",
+                "Win Probability (%)",
+                "FanDuel Favorite",
+                "Agrees With Favorite",
+            ]
+        ]        
 
         st.dataframe(
             display,
