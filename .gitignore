@@ -1,0 +1,18 @@
+# Python environment
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Local secrets
+config.json
+.streamlit/secrets.toml
+.env
+
+# Generated output
+outputs/
+*.log
+
+# Operating system files
+.DS_Store
+Thumbs.db
