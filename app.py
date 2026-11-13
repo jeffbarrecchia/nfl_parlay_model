@@ -50,11 +50,38 @@ def load_config():
 
     return config
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_historical_data():
-    games = load_historical_games(DATA_PATH)
+    import nflreadpy as nfl
+
+    try:
+        # Download the latest NFL schedule and results.
+        current_year = datetime.now().year
+        seasons = list(range(2010, current_year + 1))
+
+        schedule = nfl.load_schedules(seasons).to_pandas()
+
+        # Keep only completed games for model features.
+        completed = schedule.dropna(
+            subset=["home_score", "away_score"]
+        ).copy()
+
+        # Reuse the existing historical-data validation.
+        games = completed.copy()
+        games["gameday"] = pd.to_datetime(
+            games["gameday"], errors="coerce"
+        )
+
+    except Exception as exc:
+        st.warning(
+            f"Live NFL data unavailable. Using saved data instead: {exc}"
+        )
+
+        games = load_historical_games(DATA_PATH)
+        schedule = pd.read_csv(DATA_PATH)
+
     features = build_team_features(games)
-    schedule = pd.read_csv(DATA_PATH)
+
     return games, features, schedule
 
 
@@ -97,10 +124,36 @@ with st.sidebar:
 
     st.caption("Odds refreshes use your configured Odds API account.")
 
+    from datetime import date
+
+    current_date = date.today()
+
+    # Use the official NFL schedule to determine the current week.
+    season_schedule = schedule[
+        (schedule["season"] == current_date.year)
+        & (schedule["game_type"] == "REG")
+    ].copy()
+
+    season_schedule["gameday"] = pd.to_datetime(
+        season_schedule["gameday"], errors="coerce"
+    )
+
+    # Find the latest NFL week that has started.
+    started_games = season_schedule[
+        season_schedule["gameday"].dt.date <= current_date
+    ]
+
+    if not started_games.empty:
+        current_week = int(started_games["week"].max())
+    else:
+        current_week = 1
+
+    current_week = max(1, min(18, current_week))
+
     selected_week = st.selectbox(
         "NFL Week",
         options=list(range(1, 19)),
-        index=6,
+        index=current_week - 1,
     )
 
     st.divider()
