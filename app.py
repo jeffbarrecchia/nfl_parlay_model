@@ -226,10 +226,9 @@ weekly_rankings = rankings[
 if weekly_rankings.empty:
     st.warning(f"No games with available odds were found for NFL Week {selected_week}.")
 else:
-    tab_rankings, tab_market, tab_bets, tab_parlay = st.tabs(
+    tab_rankings, tab_bets, tab_parlay = st.tabs(
         [
             "🏈 Weekly Rankings",
-            "📊 Model vs. Market",
             "💰 Potential Bets",
             "🎲 Three-Leg Parlay",
         ]
@@ -297,8 +296,8 @@ else:
         )
 
         display["commence_time"] = pd.to_datetime(
-            display["commence_time"], utc=True
-        ).dt.strftime("%a %b %d, %I:%M %p UTC")
+            display["commence_time"], errors="coerce", utc=True
+        ).dt.tz_convert("America/New_York").dt.strftime("%b %d, %Y")
 
         display["model_win_probability"] = (
             display["model_win_probability"] * 100
@@ -326,8 +325,6 @@ else:
                 "Model Pick",
                 "Model Pick Odds",
                 "Win Probability (%)",
-                "FanDuel Favorite",
-                "Agrees With Favorite",
             ]
         ]        
 
@@ -342,53 +339,6 @@ else:
             data=weekly_rankings.to_csv(index=False).encode("utf-8"),
             file_name=f"nfl_week_{selected_week}_rankings.csv",
             mime="text/csv",
-        )
-
-    with tab_market:
-        st.subheader("Model vs. FanDuel")
-
-        market_columns = [
-            "rank",
-            "away_team",
-            "home_team",
-            "home_no_vig_probability",
-            "away_no_vig_probability",
-            "home_model_vs_market",
-            "away_model_vs_market",
-        ]
-
-        market = weekly_rankings[market_columns].copy()
-
-        market = market.rename(
-            columns={
-                "rank": "Rank",
-                "away_team": "Away Team",
-                "home_team": "Home Team",
-                "home_no_vig_probability": "Home Market Probability",
-                "away_no_vig_probability": "Away Market Probability",
-                "home_model_vs_market": "Home Model Difference",
-                "away_model_vs_market": "Away Model Difference",
-            }
-        )
-
-        st.dataframe(
-            market.style.format(
-                {
-                    "Home Market Probability": "{:.1%}",
-                    "Away Market Probability": "{:.1%}",
-                    "Home Model Difference": "{:+.1%}",
-                    "Away Model Difference": "{:+.1%}",
-                },
-                na_rep="N/A",
-            ),
-            hide_index=True,
-            use_container_width=True,
-        )
-
-        st.caption(
-            "Positive differences mean the model assigns a higher win "
-            "probability than the no-vig market estimate. This does not "
-            "establish that a bet is profitable."
         )
 
     with tab_bets:
@@ -422,9 +372,16 @@ else:
             ].copy()
 
             weekly_candidates = weekly_candidates.sort_values(
-                "expected_roi",
+                "probability",
                 ascending=False,
             )
+            
+            # Format game dates for display only.
+            weekly_candidates["commence_time"] = pd.to_datetime(
+                weekly_candidates["commence_time"],
+                errors="coerce",
+                utc=True
+            ).dt.tz_convert("America/New_York").dt.strftime("%b %d, %Y")
 
             st.dataframe(
                 weekly_candidates[
@@ -434,14 +391,22 @@ else:
                         "odds",
                         "probability",
                         "edge",
-                        "expected_roi",
                     ]
-                ].style.format(
+                ]
+                .rename(
+                    columns={
+                        "commence_time": "Game Date",
+                        "selection": "Selection",
+                        "odds": "Odds",
+                        "probability": "Win Probability",
+                        "edge": "Model Edge",
+                    }
+                )
+                .style.format(
                     {
-                        "odds": "{:+.0f}",
-                        "probability": "{:.1%}",
-                        "edge": "{:+.1%}",
-                        "expected_roi": "{:+.1%}",
+                        "Odds": "{:+.0f}",
+                        "Win Probability": "{:.1%}",
+                        "Model Edge": "{:+.1%}",
                     }
                 ),
                 hide_index=True,
@@ -511,21 +476,38 @@ else:
                     "Estimated ROI",
                     f"{parlay['expected_roi']:+.1%}",
                 )
+                # Create a display-only copy of the parlay selections.
+                parlay_display = parlay["legs"].copy()
+
+                # Format game dates in Eastern Time.
+                parlay_display["Game Date"] = pd.to_datetime(
+                    parlay_display["commence_time"],
+                    errors="coerce",
+                    utc=True
+                ).dt.tz_convert("America/New_York").dt.strftime("%b %d, %Y")
 
                 st.dataframe(
-                    parlay["legs"][
+                    parlay_display[
                         [
+                            "Game Date",
                             "selection",
                             "market",
                             "odds",
                             "probability",
-                            "expected_roi",
                         ]
-                    ].style.format(
+                    ]
+                    .rename(
+                        columns={
+                            "selection": "Selection",
+                            "market": "Market",
+                            "odds": "Odds",
+                            "probability": "Win Probability",
+                        }
+                    )
+                    .style.format(
                         {
-                            "odds": "{:+.0f}",
-                            "probability": "{:.1%}",
-                            "expected_roi": "{:+.1%}",
+                            "Odds": "{:+.0f}",
+                            "Win Probability": "{:.1%}",
                         }
                     ),
                     hide_index=True,
